@@ -41,6 +41,7 @@ import org.slf4j.LoggerFactory;
  */
 public final class PAAgentManager {
 
+
 	private static final Logger log = LoggerFactory.getLogger(PAAgentManager.class);
 
 	/**
@@ -51,6 +52,14 @@ public final class PAAgentManager {
 	private final LinkedHashMap<String, PAAgent> agentsWithPerceptsAndActions;
 
 	private final Map<String, String> agentsPerformingBdiDriveTo;
+
+	private final Map<String, String> agentsPerformingBdiWalkTo1;
+	private final Map<String, String> agentsPerformingBdiWalkTo2;
+	private final Map<String, String> agentsPerformingBdiWalkTo3;
+	private final Map<String, String> agentsPerformingBdiWalkTo4;
+	private final Map<String, String> agentsPerformingBdiWalkTo5;
+	private final Map<String, String> agentsPerformingBdiWalkTo6;
+	private final Map<String, String> agentsPerformingBdiWalkTo7;
 	private final Map<String, Double> agentsWaitingForTimeEvent;
 
 
@@ -63,10 +72,18 @@ public final class PAAgentManager {
 	}
 
 	public PAAgentManager(EventsMonitorRegistry eventsMonitors) {
+		System.out.println("PAAgentManager initialized.");
 		this.eventsMonitors = eventsMonitors;
 		agentsWithPerceptsAndActions = new LinkedHashMap<>();
 		agentsPerformingBdiDriveTo = new HashMap<>();
 		agentsWaitingForTimeEvent = new HashMap<>();
+		agentsPerformingBdiWalkTo1 = new HashMap<>();
+		agentsPerformingBdiWalkTo2 = new HashMap<>();
+		agentsPerformingBdiWalkTo3 = new HashMap<>();
+		agentsPerformingBdiWalkTo4 = new HashMap<>();
+		agentsPerformingBdiWalkTo5 = new HashMap<>();
+		agentsPerformingBdiWalkTo6 = new HashMap<>();
+		agentsPerformingBdiWalkTo7 = new HashMap<>();
 	}
 
 	public final PAAgent getAgent(String agentID) {
@@ -74,7 +91,13 @@ public final class PAAgentManager {
 	}
 
 	public Map<String, String> getAgentsPerformingBdiDriveTo() { return agentsPerformingBdiDriveTo; }
-
+	public Map<String, String> getAgentsPerformingBdiWalkTo1() { return agentsPerformingBdiWalkTo1; }
+	public Map<String, String> getAgentsPerformingBdiWalkTo2() { return agentsPerformingBdiWalkTo2; }
+	public Map<String, String> getAgentsPerformingBdiWalkTo3() { return agentsPerformingBdiWalkTo3; }
+	public Map<String, String> getAgentsPerformingBdiWalkTo4() { return agentsPerformingBdiWalkTo4; }
+	public Map<String, String> getAgentsPerformingBdiWalkTo5() { return agentsPerformingBdiWalkTo5; }
+	public Map<String, String> getAgentsPerformingBdiWalkTo6() { return agentsPerformingBdiWalkTo6; }
+	public Map<String, String> getAgentsPerformingBdiWalkTo7() { return agentsPerformingBdiWalkTo7; }
 	public Map<String, Double> getAgentsWaitingForTimeEvent() { return agentsWaitingForTimeEvent; }
 
 
@@ -85,10 +108,13 @@ public final class PAAgentManager {
 	 * functionality
 	 */
 	public final boolean createAndAddBDIAgent(String agentID) {
+
+		System.out.println("Creating BDI agent with ID: " + agentID);
 		PAAgent agent = new PAAgent( eventsMonitors, agentID,
 				new ActionPerceptContainer() // own copy, *NOT* connected to agentDataContainer, ds 28/nov/17
 		);
 		agentsWithPerceptsAndActions.put(agentID, agent);
+		System.out.println("Agent added to agentsWithPerceptsAndActions: " + agentID);
 		return true;
 	}
 
@@ -134,36 +160,45 @@ public final class PAAgentManager {
 		}
 	}
 
+
+
+
 	public void updateActions(io.github.agentsoz.bdiabm.v2.AgentDataContainer inAdc, io.github.agentsoz.bdiabm.v2.AgentDataContainer outAdc) {
 		if (inAdc != null) {
 			Iterator<String> it = inAdc.getAgentIdIterator();
 			while (it.hasNext()) {
 				String agentId = it.next();
-				// Process the incoming action updates
+				System.out.println("[DEBUG] Processing actions for agent: " + agentId);
+
 				Map<String, ActionContent> actions = inAdc.getAllActionsCopy(agentId);
 				for (String actionId : actions.keySet()) {
 					ActionContent content = actions.get(actionId);
-					if (content.getState()== ActionContent.State.INITIATED) {
+					System.out.println("[DEBUG] Agent: " + agentId + ", Action: " + actionId + ", Initial State: " + content.getState());
+
+					// ADD CHECK FOR EVACUATION
+					if (actionId.equalsIgnoreCase("evacuate") || actionId.contains("evac")) {
+						System.out.println("[DEBUG] 🚨 Evacuation action detected for agent: " + agentId);
+					}
+
+					if (content.getState() == ActionContent.State.INITIATED) {
 						if (agentsWithPerceptsAndActions.containsKey(agentId)) {
 							PAAgent agent = getAgent(agentId);
 							Object[] parameters = content.getParameters();
+
+							System.out.println("[DEBUG] Agent: " + agentId + " - Initiating action: " + actionId);
 							ActionContent.State res = agent.getActionHandler().processAction(agentId, actionId, parameters);
 							content.setState(res);
 							outAdc.putAction(agentId, actionId, content);
-						}
-					} else if (content.getState()== ActionContent.State.DROPPED) {
-						if (agentsWithPerceptsAndActions.containsKey(agentId)) {
-							PAAgent agent = getAgent(agentId);
-							agent.getActionHandler().deregisterBDIAction(actionId);
-							content.setState(ActionContent.State.DROPPED);
-							outAdc.putAction(agentId, actionId, content);
-							log.info("agent {} dropped BDI action {}; MATSim leg is running detached now", agentId, actionId);
+							System.out.println("[DEBUG] Agent: " + agentId + " - Action: " + actionId + " - Updated State: " + res);
 						}
 					}
 				}
 			}
 		}
 	}
+
+
+
 
 	/**
 	 * Adds TIME percept for agents waiting for given time to lapse

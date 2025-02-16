@@ -41,12 +41,12 @@ import org.matsim.core.mobsim.qsim.agents.WithinDayAgentUtils;
 
 import java.util.Map;
 
-public final class ActionHandlerForPerceive implements BDIActionHandler {
-	private static final Logger log = Logger.getLogger( ActionHandlerForPerceive.class ) ;
+public final class ActionHandlerForPerceiveWalkto1 implements BDIActionHandler {
+	private static final Logger log = Logger.getLogger( ActionHandlerForPerceiveWalkto1.class ) ;
 
 	private final MATSimModel model;
 
-	public ActionHandlerForPerceive(MATSimModel model ) {
+	public ActionHandlerForPerceiveWalkto1(MATSimModel model ) {
 		this.model = model;
 	}
 	@Override
@@ -70,6 +70,7 @@ public final class ActionHandlerForPerceive implements BDIActionHandler {
 						Double timeToMonitor = model.getTime() + (Double)args[i];
 						model.getAgentManager().getAgentsWaitingForTimeEvent().put(agentID, timeToMonitor);
 					}
+
 					break;
 				case PerceptList.BLOCKED:
 					paAgent.getPerceptHandler().registerBDIPerceptHandler(paAgent.getAgentID(),
@@ -82,12 +83,12 @@ public final class ActionHandlerForPerceive implements BDIActionHandler {
 									PerceptContent pc = new PerceptContent(PerceptList.BLOCKED, event.getAttributes());
 									model.getAgentManager().getAgentDataContainerV2().putPercept(agent.getAgentID(), PerceptList.BLOCKED, pc);
 
-									// If agent was driving then also send back status for the driveTo action
-									if (model.getAgentManager().getAgentsPerformingBdiDriveTo().containsKey(agentID)) {
-										model.getAgentManager().getAgentsPerformingBdiDriveTo().remove(agentID);
+
+									if (model.getAgentManager().getAgentsPerformingBdiWalkTo1().containsKey(agentID)) {
+										model.getAgentManager().getAgentsPerformingBdiWalkTo1().remove(agentID);
 										Object[] params = {currentLinkId, event.getAttributes().get("nextLink")};
-										ActionContent ac = new ActionContent(params, ActionContent.State.FAILED, ActionList.DRIVETO);
-										model.getAgentManager().getAgentDataContainerV2().putAction(agent.getAgentID(), ActionList.DRIVETO, ac);
+										ActionContent ac = new ActionContent(params, ActionContent.State.FAILED, ActionList.WALKTO1);
+										model.getAgentManager().getAgentDataContainerV2().putAction(agent.getAgentID(), ActionList.WALKTO1, ac);
 									}
 									return false; // do not unregister
 								}
@@ -106,12 +107,11 @@ public final class ActionHandlerForPerceive implements BDIActionHandler {
 									PerceptContent pc = new PerceptContent(PerceptList.CONGESTION, event.getAttributes());
 									model.getAgentManager().getAgentDataContainerV2().putPercept(agent.getAgentID(), PerceptList.CONGESTION, pc);
 
-									// If agent was driving to this link then also send back status for the driveTo action
-									if (model.getAgentManager().getAgentsPerformingBdiDriveTo().containsKey(agentID)) {
-										model.getAgentManager().getAgentsPerformingBdiDriveTo().remove(agentID);
+									if (model.getAgentManager().getAgentsPerformingBdiWalkTo1().containsKey(agentID)) {
+										model.getAgentManager().getAgentsPerformingBdiWalkTo1().remove(agentID);
 										Object[] params = {currentLinkId};
-										ActionContent ac = new ActionContent(params, ActionContent.State.FAILED, ActionList.DRIVETO);
-										model.getAgentManager().getAgentDataContainerV2().putAction(agent.getAgentID(), ActionList.DRIVETO, ac);
+										ActionContent ac = new ActionContent(params, ActionContent.State.FAILED, ActionList.WALKTO1);
+										model.getAgentManager().getAgentDataContainerV2().putAction(agent.getAgentID(), ActionList.WALKTO1, ac);
 									}
 
 									return false; // do not unregister
@@ -199,13 +199,12 @@ public final class ActionHandlerForPerceive implements BDIActionHandler {
 									PerceptContent pc = new PerceptContent(PerceptList.ARRIVED, event.getAttributes());
 									model.getAgentManager().getAgentDataContainerV2().putPercept(agent.getAgentID(), PerceptList.ARRIVED, pc);
 
-									// If agent was driving to this link then also send back status for the driveTo action
-									if (model.getAgentManager().getAgentsPerformingBdiDriveTo().containsKey(agentID)
-											&& model.getAgentManager().getAgentsPerformingBdiDriveTo().get(agentID).equals(currentLinkId)) {
-										model.getAgentManager().getAgentsPerformingBdiDriveTo().remove(agentID);
+									if (model.getAgentManager().getAgentsPerformingBdiWalkTo1().containsKey(agentID)
+											&& model.getAgentManager().getAgentsPerformingBdiWalkTo1().get(agentID).equals(currentLinkId)) {
+										model.getAgentManager().getAgentsPerformingBdiWalkTo1().remove(agentID);
 										Object[] params = {currentLinkId};
-										ActionContent ac = new ActionContent(params, ActionContent.State.PASSED, ActionList.DRIVETO);
-										model.getAgentManager().getAgentDataContainerV2().putAction(agent.getAgentID(), ActionList.DRIVETO, ac);
+										ActionContent ac = new ActionContent(params, ActionContent.State.PASSED, ActionList.WALKTO1);
+										model.getAgentManager().getAgentDataContainerV2().putAction(agent.getAgentID(), ActionList.WALKTO1, ac);
 									}
 									return false; // do not unregister
 								}
@@ -235,12 +234,11 @@ public final class ActionHandlerForPerceive implements BDIActionHandler {
 									}
 									model.getAgentManager().getAgentDataContainerV2().putPercept(agent.getAgentID(), PerceptList.STUCK, pc);
 
-									// If agent was driving then also send back status for the driveTo action
-									if (model.getAgentManager().getAgentsPerformingBdiDriveTo().containsKey(agentID)) {
-										model.getAgentManager().getAgentsPerformingBdiDriveTo().remove(agentID);
+									if (model.getAgentManager().getAgentsPerformingBdiWalkTo1().containsKey(agentID)) {
+										model.getAgentManager().getAgentsPerformingBdiWalkTo1().remove(agentID);
 										Object[] params = {currentLinkId, event.getAttributes().get("nextLink")};
-										ActionContent ac = new ActionContent(params, ActionContent.State.FAILED, ActionList.DRIVETO);
-										model.getAgentManager().getAgentDataContainerV2().putAction(agent.getAgentID(), ActionList.DRIVETO, ac);
+										ActionContent ac = new ActionContent(params, ActionContent.State.FAILED, ActionList.WALKTO1);
+										model.getAgentManager().getAgentDataContainerV2().putAction(agent.getAgentID(), ActionList.WALKTO1, ac);
 									}
 									return false; // do not unregister
 								}

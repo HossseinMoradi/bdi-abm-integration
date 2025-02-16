@@ -1,7 +1,5 @@
 package io.github.agentsoz.bdimatsim;
 
-import com.google.inject.Inject;
-import com.google.inject.Singleton;
 import io.github.agentsoz.bdiabm.ABMServerInterface;
 import io.github.agentsoz.bdiabm.ModelInterface;
 import io.github.agentsoz.bdiabm.v3.QueryPerceptInterface;
@@ -11,22 +9,22 @@ import io.github.agentsoz.bdiabm.data.PerceptContent;
 import io.github.agentsoz.dataInterface.DataClient;
 import io.github.agentsoz.dataInterface.DataServer;
 import io.github.agentsoz.bdiabm.v3.AgentNotFoundException;
+import io.github.agentsoz.nonmatsim.PAAgent;
 import io.github.agentsoz.nonmatsim.PAAgentManager;
 import io.github.agentsoz.util.Location;
 import io.github.agentsoz.util.ActionList;
 import io.github.agentsoz.util.PerceptList;
+import org.geotools.data.shapefile.files.FileReader;
 import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.network.Link;
-import org.matsim.api.core.v01.population.Activity;
-import org.matsim.api.core.v01.population.Person;
-import org.matsim.api.core.v01.population.Plan;
+import org.matsim.api.core.v01.population.*;
 import org.matsim.core.api.experimental.events.EventsManager;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
-import org.matsim.core.config.groups.ScoringConfigGroup.ActivityParams;
-import org.matsim.core.config.groups.ScoringConfigGroup.ModeParams;
+import org.matsim.core.config.groups.PlanCalcScoreConfigGroup.ActivityParams;
+import org.matsim.core.config.groups.PlanCalcScoreConfigGroup.ModeParams;
 import org.matsim.core.config.groups.PlansConfigGroup.ActivityDurationInterpretation;
 import org.matsim.core.config.groups.QSimConfigGroup.StarttimeInterpretation;
 import org.matsim.core.controler.AbstractModule;
@@ -35,11 +33,13 @@ import org.matsim.core.controler.OutputDirectoryHierarchy.OverwriteFileSetting;
 import org.matsim.core.events.handler.EventHandler;
 import org.matsim.core.gbl.Gbl;
 import org.matsim.core.mobsim.framework.MobsimAgent;
+import org.matsim.core.mobsim.framework.MobsimDriverAgent;
 import org.matsim.core.mobsim.framework.PlayPauseSimulationControl;
 import org.matsim.core.mobsim.framework.listeners.MobsimInitializedListener;
 import org.matsim.core.mobsim.qsim.AbstractQSimModule;
 import org.matsim.core.mobsim.qsim.QSim;
 import org.matsim.core.mobsim.qsim.agents.WithinDayAgentUtils;
+import org.matsim.core.mobsim.qsim.interfaces.MobsimVehicle;
 import org.matsim.core.mobsim.qsim.qnetsimengine.*;
 import org.matsim.core.network.NetworkChangeEvent;
 import org.matsim.core.network.NetworkUtils;
@@ -52,7 +52,16 @@ import org.matsim.withinday.utils.EditPlans;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.inject.Inject;
+import javax.inject.Singleton;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
+
+import static org.matsim.api.core.v01.Id.create;
 
 /*
  * #%L
@@ -64,12 +73,12 @@ import java.util.*;
  * it under the terms of the GNU Lesser General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Lesser Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Lesser Public
  * License along with this program.  If not, see
  * <http://www.gnu.org/licenses/lgpl-3.0.html>.
@@ -118,8 +127,7 @@ public final class MATSimModel implements ABMServerInterface, ModelInterface, Qu
 	/**
 	 * This is in fact a MATSim class that provides a view onto the QSim.
 	 */
-	@Inject
-	private MobsimDataProvider mobsimDataProvider ;
+	@Inject private MobsimDataProvider mobsimDataProvider ;
 	@Inject private Replanner replanner;
 	// yy This is working because MATSimModel is bound somewhere.
 
@@ -138,7 +146,7 @@ public final class MATSimModel implements ABMServerInterface, ModelInterface, Qu
 	private final Map<String, DataClient> dataListeners = createDataListeners();
 	private AgentDataContainer adc = new AgentDataContainer();
 
-	public enum RoutingMode {carFreespeed, carGlobalInformation}
+	public enum RoutingMode {carFreespeed, carGlobalInformation, sOneFree, sTwoFree, sThreeFree, sFourFree, sFiveFree, sSixFree, sSevenFree, sOneGlobal, sTwoGlobal, sThreeGlobal, sFourGlobal, sFiveGlobal, sSixGlobal, sSevenGlobal}
 
 	private Controler controller;
 
@@ -152,9 +160,9 @@ public final class MATSimModel implements ABMServerInterface, ModelInterface, Qu
 		// yyyy this is so far NOT the same as what is was originally, see below, since the code below
 		// could pass "null" which the new code cannot.  (However, the "null" was not really handled
 		// correctly in the receiving code so it needs to be repaired ...).  kai, nov'18
-		
+
 //		this(opts.get(eConfigFile), opts.get(eOutputDir), opts.get(eGlobalStartHhMm));
-		
+
 		registerDataServer(dataServer);
 
 		if (opts == null) {
@@ -212,25 +220,25 @@ public final class MATSimModel implements ABMServerInterface, ModelInterface, Qu
 
 		config.qsim().setSimStarttimeInterpretation( StarttimeInterpretation.onlyUseStarttime );
 
-		config.controller().setWritePlansInterval(1);
-		config.controller().setOverwriteFileSetting( OverwriteFileSetting.deleteDirectoryIfExists );
+		config.controler().setWritePlansInterval(1);
+		config.controler().setOverwriteFileSetting( OverwriteFileSetting.deleteDirectoryIfExists );
 
-		config.scoring().setWriteExperiencedPlans(true);
+		config.planCalcScore().setWriteExperiencedPlans(true);
 
 		// we have to declare those routingModes where we want to use the network router:
 		{
-			Collection<String> modes = config.routing().getNetworkModes();
+			Collection<String> modes = config.plansCalcRoute().getNetworkModes();
 			Set<String> newModes = new TreeSet<>( modes ) ;
 			for ( RoutingMode mode : RoutingMode.values() ) {
 				newModes.add( mode.name() ) ;
 			}
-			config.routing().setNetworkModes( newModes );
+			config.plansCalcRoute().setNetworkModes( newModes );
 		}
 
 		// the router also needs scoring parameters:
 		for ( RoutingMode mode : RoutingMode.values() ) {
 			ModeParams params = new ModeParams(mode.name());
-			config.scoring().addModeParams(params);
+			config.planCalcScore().addModeParams(params);
 		}
 
 //		config.plansCalcRoute().setInsertingAccessEgressWalk(true);
@@ -284,18 +292,65 @@ public final class MATSimModel implements ABMServerInterface, ModelInterface, Qu
 					ActionList.REPLAN_CURRENT_DRIVETO, new ActionHandlerForReplanDriveto(this) );
 			agentManager.getAgent(agentId).getActionHandler().registerBDIAction(
 					ActionList.PERCEIVE, new ActionHandlerForPerceive(this));
+
+			agentManager.getAgent(agentId).getActionHandler().registerBDIAction(
+					ActionList.WALKTO1, new ActionHandlerForWalkto1(this) );
+			agentManager.getAgent(agentId).getActionHandler().registerBDIAction(
+					ActionList.REPLAN_CURRENT_WALKTO1, new ActionHandlerForReplanWalkto1(this) );
+			agentManager.getAgent(agentId).getActionHandler().registerBDIAction(
+					ActionList.PERCEIVE_WALKTO1, new ActionHandlerForPerceiveWalkto1(this));
 		}
 		{
 			// New default activity types
 			{
 				ActivityParams params = new ActivityParams("DriveTo");
 				params.setScoringThisActivityAtAll(false);
-				scenario.getConfig().scoring().addActivityParams(params);
+				scenario.getConfig().planCalcScore().addActivityParams(params);
+			}
+			{
+				ActivityParams params = new ActivityParams("WalkTo1");
+				params.setScoringThisActivityAtAll(false);
+				scenario.getConfig().planCalcScore().addActivityParams(params);
+			}
+
+			{
+				ActivityParams params = new ActivityParams("WalkTo2");
+				params.setScoringThisActivityAtAll(false);
+				scenario.getConfig().planCalcScore().addActivityParams(params);
+			}
+
+			{
+				ActivityParams params = new ActivityParams("WalkTo3");
+				params.setScoringThisActivityAtAll(false);
+				scenario.getConfig().planCalcScore().addActivityParams(params);
+			}
+
+			{
+				ActivityParams params = new ActivityParams("WalkTo4");
+				params.setScoringThisActivityAtAll(false);
+				scenario.getConfig().planCalcScore().addActivityParams(params);
+			}
+
+			{
+				ActivityParams params = new ActivityParams("WalkTo5");
+				params.setScoringThisActivityAtAll(false);
+				scenario.getConfig().planCalcScore().addActivityParams(params);
+			}
+
+			{
+				ActivityParams params = new ActivityParams("WalkTo6");
+				params.setScoringThisActivityAtAll(false);
+				scenario.getConfig().planCalcScore().addActivityParams(params);
+			}
+			{
+				ActivityParams params = new ActivityParams("WalkTo7");
+				params.setScoringThisActivityAtAll(false);
+				scenario.getConfig().planCalcScore().addActivityParams(params);
 			}
 			{
 				ActivityParams params = new ActivityParams("Replan");
 				params.setScoringThisActivityAtAll(false);
-				scenario.getConfig().scoring().addActivityParams(params);
+				scenario.getConfig().planCalcScore().addActivityParams(params);
 			}
 			// Any extra activity types provided by the caller
 			if (args.length>1) {
@@ -304,7 +359,7 @@ public final class MATSimModel implements ABMServerInterface, ModelInterface, Qu
 					for (String activity : activityNames) {
 						ActivityParams ap = new ActivityParams(activity);
 						ap.setScoringThisActivityAtAll(false);
-						scenario.getConfig().scoring().addActivityParams(ap);
+						scenario.getConfig().planCalcScore().addActivityParams(ap);
 					}
 				} catch (Exception e) {
 					log.error("Could not parse expected list of activity names from: {}", args[1]);
@@ -584,7 +639,7 @@ public final class MATSimModel implements ABMServerInterface, ModelInterface, Qu
 		// yyyy wanted to delay this until some agent has actually encountered it.  kai, feb'18
 
 	}
-	
+
 	public static double convertTimeToSeconds(String startHHMM) {
 		int hours = Integer.parseInt(startHHMM.substring(0, 2));
 		int minutes = Integer.parseInt(startHHMM.substring(2, 4));
@@ -592,7 +647,7 @@ public final class MATSimModel implements ABMServerInterface, ModelInterface, Qu
 		log.debug("orig={}, hours={}, min={}, sTime={}", startHHMM, hours, minutes, startTime);
 		return startTime;
 	}
-	
+
 
 	public final double getTime() {
 		return this.qSim.getSimTimer().getTimeOfDay() ;
@@ -645,7 +700,7 @@ public final class MATSimModel implements ABMServerInterface, ModelInterface, Qu
 
 				}
 				else{ // if agent is currently in a leg
-					
+
 					Activity destAct = this.getReplanner().editTrips().findCurrentTrip(this.getMobsimAgentFromIdString(agentID)).getDestinationActivity();
 					cords[0] = destAct.getCoord().getX();
 					cords[1] = destAct.getCoord().getY();
@@ -659,7 +714,6 @@ public final class MATSimModel implements ABMServerInterface, ModelInterface, Qu
 	public PAAgentManager getAgentManager() {
 		return agentManager;
 	}
-
 	public MobsimDataProvider getMobsimDataProvider() {
 		return mobsimDataProvider;
 	}
@@ -667,6 +721,12 @@ public final class MATSimModel implements ABMServerInterface, ModelInterface, Qu
 	public MobsimAgent getMobsimAgentFromIdString( String idString ) {
 		return this.getMobsimDataProvider().getAgent( Id.createPersonId(idString) ) ;
 	}
+
+
+
+
+
+
 
 	public EventsManager getEvents() {
 		return this.qSim.getEventsManager() ;

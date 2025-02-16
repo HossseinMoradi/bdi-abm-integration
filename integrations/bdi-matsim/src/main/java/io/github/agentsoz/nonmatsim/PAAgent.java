@@ -13,12 +13,10 @@ package io.github.agentsoz.nonmatsim;
  * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Lesser Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Lesser Public License for more details.
  * 
- * You should have received a copy of the GNU General Lesser Public
- * License along with this program.  If not, see
- * <http://www.gnu.org/licenses/lgpl-3.0.html>.
+ * You should have received a copy of the GNU General Lesser Public License along with this program.
+ * If not, see <http://www.gnu.org/licenses/lgpl-3.0.html>.
  * #L%
  */
 
@@ -31,30 +29,25 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.network.Link;
+import org.matsim.vehicles.Vehicle;
 
 /**
- * Agent Object on the ABM side Holds information: an
- *         Agent's actionContainer and perceptContainer, the correct
- *         PerceptHandler and ActionHandler, and lists of driveToActions
- *         
- *         
- * @author Edmund Kemsley 
+ * Agent Object on the ABM side.
+ * Holds information: an Agent's actionContainer and perceptContainer,
+ * the correct PerceptHandler and ActionHandler, and lists of driveToActions.
+ *
+ * @author Edmund Kemsley
  */
 public final class PAAgent {
-	/* Design decisions/changes:
-	 * - drive actions were never used, so I removed them.  This should make the agent type more general.  kai, oct/nov'17
-	 * - because it was now more general, I renamed it first to AgentWithPerceptsAndActions, and now short to
-	 *   PAAgent = PerceptActionAgent.  Could be renamed into something else if that makes more sense from the framework
-	 *   perspective.  kai, oct/nov'17
-	 */
 
 	private final PerceptHandler perceptHandler;
 	private final ActionHandler actionHandler = new ActionHandler();
 	private final EventsMonitorRegistry eventsMonitorRegistry;
 	private final String agentID;
-
 	private ActionPerceptContainer actPerceptContainer;
+
 
 	public final String getAgentID() {
 		return agentID;
@@ -76,6 +69,8 @@ public final class PAAgent {
 		return this.actPerceptContainer.getPerceptContainer();
 	}
 
+
+
 	PAAgent(EventsMonitorRegistry eventsMonitors, String agentID, ActionPerceptContainer actPerceptContainer) {
 		this.eventsMonitorRegistry = eventsMonitors;
 		this.perceptHandler = new PerceptHandler(eventsMonitors);
@@ -83,11 +78,12 @@ public final class PAAgent {
 		this.actPerceptContainer = actPerceptContainer;
 	}
 
-	public boolean hasPersonArrivalEventMonitor() {
-		return eventsMonitorRegistry.hasPersonArrivalEventMonitorFor(agentID);
-	}
 
 	public void removePersonArrivalEventMonitor() {
 		eventsMonitorRegistry.removePersonArrivalEventMonitorFor(agentID);
 	}
+
+
+
+
 }

@@ -22,6 +22,7 @@ package io.github.agentsoz.nonmatsim;
  * #L%
  */
 
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -34,49 +35,35 @@ import io.github.agentsoz.util.ActionList;
  */
 
 public final class ActionHandler {
-	
+
 	private final Map<String, BDIActionHandler> registeredActions = new LinkedHashMap<>();
 
-	/** 
-	 * Registers a new BDI action. Typical usage example:<pre><code>
-	 * registerBDIAction("MyNewAction", new BDIActionHandler() {
-	 *    {@literal @}Override
-	 *    public boolean handle(String agentID, String actionID, Object[] args ) {
-	 *       MATSimAgent agent = model.getBDIAgent(agentID);
-	 *       // Code to handle MyNewAction goes here ...
-	 *       return true;
-	 *    }
-	 * });
-	 * </code></pre>
-	 * @param actionID unique action id
-	 * @param actionHandler the handler to use for this action
-	 */
 	public final void registerBDIAction(String actionID, BDIActionHandler actionHandler) {
+		System.out.println("Registering action: " + actionID);
 		registeredActions.put(actionID, actionHandler);
 	}
 
-	/**
-	 * Process incoming BDI actions by for this MATSim agent, by calling its
-	 * registered {@link BDIActionHandler}.
-	 * 
-	 * @param agentID ID of the agent
-	 * @param actionID ID of the action, defined in {@link ActionList}
-	 * @param parameters Parameters associated with the action
-	 * @return whether the action was processed successfully or not
-	 */
 	final ActionContent.State processAction(String agentID, String actionID, Object[] parameters) {
-		if ( registeredActions.isEmpty() ) {
-			throw new RuntimeException("no BDI action registered at all; this is probably not what you want; aborting ... " ) ;
+		System.out.println("Processing action: " + actionID + " for agent: " + agentID);
+		System.out.println("Registered actions: " + registeredActions.keySet());
+
+		if (registeredActions.isEmpty()) {
+			throw new RuntimeException("No BDI actions registered; aborting.");
 		}
+
 		for (String action : registeredActions.keySet()) {
 			if (actionID.equals(action)) {
+				System.out.println("Invoking handler for action: " + actionID + " with parameters: " + Arrays.toString(parameters));
 				return registeredActions.get(actionID).handle(agentID, actionID, parameters);
 			}
 		}
+
+		System.out.println("Action not found: " + actionID);
 		return ActionContent.State.FAILED;
 	}
 
 	public void deregisterBDIAction(String actionID) {
+		System.out.println("Deregistering action: " + actionID);
 		registeredActions.remove(actionID);
 	}
 }
